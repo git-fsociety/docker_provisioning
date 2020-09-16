@@ -1,0 +1,77 @@
+---
+- hosts: node
+
+  tasks:
+    - name: 'Removendo dependencias mais antigas do docker'
+      apt:
+        name: "{{ item }}"
+        state: absent
+      become: yes
+      with_items:
+        - docker
+        - docker-engine
+        - docker.io
+        - containerd
+        - runc
+
+    - name: 'Atualizando indices de pacotes'
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      become: yes
+      with_items:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg-agent
+        - software-properties-common
+        - gpg
+        - git
+
+    - name: 'Incluindo chave GPG oficial do Docker'
+      apt_key:
+        id: "{{ gpg_oficial_key }}"
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+      become: yes
+
+    - name: 'Incluindo repositorio oficial'
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/debian buster stable
+        state: present
+      become: yes
+
+    - name: 'Realizando instalação do docker engine'
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      become: yes
+      with_items:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+
+    - name: 'Criando e incluindo usuarios ao grupo do docker'
+      user:
+        name: "{{ item }}"
+        shell: /bin/bash
+        group: docker
+        state: present
+        password: "{{ user_password }}"
+      become: yes
+      with_items:
+        "{{ username }}"
+
+    - name: 'Realizando download e instalação docker-compose'
+      get_url:
+        url: https://github.com/docker/compose/releases/download/{{ compose_version }}/docker-compose-{{ compose_arch }}
+        dest: "{{ compose_path }}/docker-compose"
+      become: yes
+
+    - name: 'Ajustando permissões do docker-compose'
+      file:
+        path: "{{ compose_path }}/docker-compose"
+        mode: u=rw,g=r,o+x
+      become: yes
